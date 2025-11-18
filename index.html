@@ -107,7 +107,7 @@
             const modalCloseButton = document.getElementById('modal-close-button');
 
             /**
-             * Shows a custom notification modal.
+             * Shows a custom notification modal. (Kept only for errors/warnings)
              * @param {string} message The message to display.
              */
             function showNotification(message) {
@@ -141,6 +141,7 @@
                 // Use document.execCommand('copy') for better compatibility in iframe environments
                 try {
                     document.execCommand('copy');
+                    // Success notification removed per user request for cleaner workflow
                     return true;
                 } catch (err) {
                     console.error('Failed to copy text: ', err);
@@ -202,9 +203,8 @@
                 if (words.length === 0) {
                     filteredText = originalText;
                     filteredTextarea.value = filteredText;
-                    if (copyToClipboard(filteredText)) {
-                        showNotification("No words specified for removal. The original text was copied to the clipboard.");
-                    }
+                    copyToClipboard(filteredText); // Copy without popup
+                    wordsInput.focus(); // Focus on words input
                     return;
                 }
 
@@ -221,7 +221,6 @@
                     const regex = new RegExp(pattern, flags);
                     
                     // 4. Perform the replacement. Use an empty string to remove the matched words.
-                    // The \b boundary ensures we only remove whole words, even if surrounded by punctuation like [word].
                     filteredText = originalText.replace(regex, ''); 
 
                     // 5. Clean up extra spaces caused by word removal, including those next to punctuation/brackets.
@@ -236,10 +235,9 @@
                     // 6. Display result
                     filteredTextarea.value = filteredText;
 
-                    // 7. Auto-copy result and provide success notification
-                    if (copyToClipboard(filteredText)) {
-                         showNotification("Text successfully filtered and copied to clipboard!");
-                    }
+                    // 7. Auto-copy result and set focus (No notification)
+                    copyToClipboard(filteredText);
+                    wordsInput.focus(); 
 
                 } catch (e) {
                     console.error("Regex Error:", e);
