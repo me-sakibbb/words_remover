@@ -14,35 +14,10 @@
 <body class="bg-gray-900 text-gray-100 min-h-screen p-6">
     <div class="max-w-4xl mx-auto">
         <div class="bg-gray-800 rounded-lg shadow-2xl p-8">
-            <h1 class="text-3xl font-bold mb-6 text-blue-400">Word Filter and Remover Tool</h1>
-            
-            <!-- Settings -->
-            <div class="mb-6 bg-gray-700 p-4 rounded-lg border border-gray-600">
-                <h2 class="text-lg font-semibold text-gray-200 mb-3">Settings</h2>
-
-                <label for="settings-words-to-remove" class="block text-sm font-medium mb-2 text-gray-300">
-                    Words to Remove (saved to browser, separated by spaces, commas, or newlines)
-                </label>
-                <textarea
-                    id="settings-words-to-remove"
-                    rows="3"
-                    class="w-full px-3 py-2 mb-3 bg-gray-600 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none text-gray-100 resize-none"
-                    placeholder="Enter words to filter out..."
-                ></textarea>
-
-                <label for="settings-filler-words" class="block text-sm font-medium mb-2 text-gray-300">
-                    Filler Words (will be wrapped in [] when detected, lowercased, no trailing . or ,)
-                </label>
-                <textarea
-                    id="settings-filler-words"
-                    rows="2"
-                    class="w-full px-3 py-2 mb-3 bg-gray-600 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none text-gray-100 resize-none"
-                    placeholder="Enter filler words..."
-                ></textarea>
-
-                <div class="flex gap-2">
-                    <button id="save-settings" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition">Save Settings</button>
-                    <button id="clear-settings" class="bg-gray-600 hover:bg-gray-500 text-white font-semibold py-2 px-4 rounded-lg transition">Clear Settings</button>
+            <div class="flex items-start justify-between">
+                <h1 class="text-3xl font-bold mb-6 text-blue-400">Word Filter and Remover Tool</h1>
+                <div class="mb-6">
+                    <button id="open-settings" class="bg-gray-700 hover:bg-gray-600 text-white font-semibold py-2 px-3 rounded-lg transition">Settings</button>
                 </div>
             </div>
 
@@ -109,6 +84,41 @@
         </div>
     </div>
 
+    <!-- Settings Modal (hidden by default) -->
+    <div id="settings-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-gray-800 rounded-lg shadow-xl p-6 max-w-lg w-full mx-4 border border-gray-700">
+            <div class="flex justify-between items-center mb-3">
+                <h3 class="text-lg font-semibold text-gray-200">Settings</h3>
+                <button id="settings-modal-close" class="text-gray-300 hover:text-white">✕</button>
+            </div>
+
+            <label for="settings-words-to-remove" class="block text-sm font-medium mb-2 text-gray-300">
+                Words to Remove (saved to browser, separated by spaces, commas, or newlines)
+            </label>
+            <textarea
+                id="settings-words-to-remove"
+                rows="3"
+                class="w-full px-3 py-2 mb-3 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none text-gray-100 resize-none"
+                placeholder="Enter words to filter out..."
+            ></textarea>
+
+            <label for="settings-filler-words" class="block text-sm font-medium mb-2 text-gray-300">
+                Filler Words (will be wrapped in [] when detected, lowercased, no trailing . or ,)
+            </label>
+            <textarea
+                id="settings-filler-words"
+                rows="2"
+                class="w-full px-3 py-2 mb-4 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none text-gray-100 resize-none"
+                placeholder="Enter filler words..."
+            ></textarea>
+
+            <div class="flex gap-2">
+                <button id="save-settings" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition">Save Settings</button>
+                <button id="clear-settings" class="bg-gray-600 hover:bg-gray-500 text-white font-semibold py-2 px-4 rounded-lg transition">Clear Settings</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         // Escape special regex characters
         function escapeRegExp(string) {
@@ -143,7 +153,9 @@
             try {
                 localStorage.setItem('wr_words_to_remove', JSON.stringify(words));
                 localStorage.setItem('wr_filler_words', JSON.stringify(fillers));
+                // give the user feedback and close the modal
                 showNotification('Settings saved to localStorage.');
+                hideSettingsModal();
             } catch (err) {
                 showNotification('Failed to save settings: ' + err.message);
             }
@@ -166,6 +178,17 @@
             document.getElementById('settings-words-to-remove').value = '';
             document.getElementById('settings-filler-words').value = '';
             showNotification('Settings cleared.');
+        }
+
+        // Show/hide settings modal
+        function showSettingsModal() {
+            const modal = document.getElementById('settings-modal');
+            if (modal) modal.classList.remove('hidden');
+        }
+
+        function hideSettingsModal() {
+            const modal = document.getElementById('settings-modal');
+            if (modal) modal.classList.add('hidden');
         }
 
         // Process text function
@@ -320,9 +343,11 @@
         // Settings buttons
         document.getElementById('save-settings').addEventListener('click', saveSettings);
         document.getElementById('clear-settings').addEventListener('click', clearSettings);
+        document.getElementById('open-settings').addEventListener('click', function() { loadSettings(); showSettingsModal(); });
 
-        // Modal close button
+        // Modal close buttons
         document.getElementById('modal-close').addEventListener('click', hideNotification);
+        document.getElementById('settings-modal-close').addEventListener('click', hideSettingsModal);
 
         // Enter key handling: when Enter in settings words-to-remove, focus filtered output
         const settingsWordsEl = document.getElementById('settings-words-to-remove');
@@ -343,10 +368,15 @@
             }
         });
 
-        // Click outside modal to close
+        // Click outside modals to close
         document.getElementById('notification-modal').addEventListener('click', function(e) {
             if (e.target === this) {
                 hideNotification();
+            }
+        });
+        document.getElementById('settings-modal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                hideSettingsModal();
             }
         });
 
