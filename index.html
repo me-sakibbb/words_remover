@@ -16,17 +16,34 @@
         <div class="bg-gray-800 rounded-lg shadow-2xl p-8">
             <h1 class="text-3xl font-bold mb-6 text-blue-400">Word Filter and Remover Tool</h1>
             
-            <!-- Words to Remove -->
-            <div class="mb-6">
-                <label for="words-to-remove" class="block text-sm font-medium mb-2 text-gray-300">
-                    Words to Remove (separated by spaces, commas, or newlines)
+            <!-- Settings -->
+            <div class="mb-6 bg-gray-700 p-4 rounded-lg border border-gray-600">
+                <h2 class="text-lg font-semibold text-gray-200 mb-3">Settings</h2>
+
+                <label for="settings-words-to-remove" class="block text-sm font-medium mb-2 text-gray-300">
+                    Words to Remove (saved to browser, separated by spaces, commas, or newlines)
                 </label>
-                <textarea 
-                    id="words-to-remove" 
-                    rows="4" 
-                    class="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none text-gray-100 resize-none"
+                <textarea
+                    id="settings-words-to-remove"
+                    rows="3"
+                    class="w-full px-3 py-2 mb-3 bg-gray-600 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none text-gray-100 resize-none"
                     placeholder="Enter words to filter out..."
                 ></textarea>
+
+                <label for="settings-filler-words" class="block text-sm font-medium mb-2 text-gray-300">
+                    Filler Words (will be wrapped in [] when detected, lowercased, no trailing . or ,)
+                </label>
+                <textarea
+                    id="settings-filler-words"
+                    rows="2"
+                    class="w-full px-3 py-2 mb-3 bg-gray-600 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none text-gray-100 resize-none"
+                    placeholder="Enter filler words..."
+                ></textarea>
+
+                <div class="flex gap-2">
+                    <button id="save-settings" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition">Save Settings</button>
+                    <button id="clear-settings" class="bg-gray-600 hover:bg-gray-500 text-white font-semibold py-2 px-4 rounded-lg transition">Clear Settings</button>
+                </div>
             </div>
 
             <!-- Original Text -->
@@ -112,6 +129,45 @@
             modal.classList.add('hidden');
         }
 
+        // Settings persistence
+        function saveSettings() {
+            const words = document.getElementById('settings-words-to-remove').value
+                .split(/[\s,\n]+/)
+                .map(s => s.trim())
+                .filter(Boolean);
+            const fillers = document.getElementById('settings-filler-words').value
+                .split(/[\s,\n]+/)
+                .map(s => s.trim())
+                .filter(Boolean);
+
+            try {
+                localStorage.setItem('wr_words_to_remove', JSON.stringify(words));
+                localStorage.setItem('wr_filler_words', JSON.stringify(fillers));
+                showNotification('Settings saved to localStorage.');
+            } catch (err) {
+                showNotification('Failed to save settings: ' + err.message);
+            }
+        }
+
+        function loadSettings() {
+            try {
+                const words = JSON.parse(localStorage.getItem('wr_words_to_remove') || '[]');
+                const fillers = JSON.parse(localStorage.getItem('wr_filler_words') || '[]');
+                document.getElementById('settings-words-to-remove').value = words.join('\n');
+                document.getElementById('settings-filler-words').value = fillers.join('\n');
+            } catch (err) {
+                console.warn('Failed to load settings:', err);
+            }
+        }
+
+        function clearSettings() {
+            localStorage.removeItem('wr_words_to_remove');
+            localStorage.removeItem('wr_filler_words');
+            document.getElementById('settings-words-to-remove').value = '';
+            document.getElementById('settings-filler-words').value = '';
+            showNotification('Settings cleared.');
+        }
+
         // Process text function
         function processText() {
             const wordsToRemoveField = document.getElementById('words-to-remove');
@@ -119,7 +175,8 @@
             const filteredTextField = document.getElementById('filtered-text');
             const caseSensitiveCheckbox = document.getElementById('case-sensitive');
 
-            const wordsToRemoveText = wordsToRemoveField.value;
+            // Read words-to-remove from settings (persisted)
+            const wordsToRemoveText = document.getElementById('settings-words-to-remove').value;
             const originalText = originalTextField.value;
 
             // Validation
@@ -133,6 +190,13 @@
                 .split(/[\s,\n]+/)
                 .map(w => w.trim().replace(/^[\[\(\{\<\"']+|[\]\)\}\>\"']+$/g, ''))
                 .filter(word => word !== '');
+
+            // Prepare filler words from settings
+            const fillerText = document.getElementById('settings-filler-words').value;
+            const fillerList = fillerText
+                .split(/[\s,\n]+/)
+                .map(w => w.trim())
+                .filter(Boolean);
 
             let filteredText = originalText;
 
@@ -175,6 +239,33 @@
                 } catch (error) {
                     showNotification('Regex error: ' + error.message);
                     return;
+                }
+            }
+
+            // Apply filler-word wrapping: wrap each detected filler word in [] (lowercased, no trailing . or , inside)
+            if (fillerList.length > 0) {
+                try {
+                    // build alternation
+                    const escapedFillers = fillerList.map(f => escapeRegExp(f));
+                    const fillerPattern = `\\b(${escapedFillers.join('|')})\\b`;
+                    const fillerRegex = new RegExp(fillerPattern, caseSensitiveCheckbox.checked ? 'g' : 'gi');
+
+                    filteredText = filteredText.replace(fillerRegex, function(match, p1, offset, string) {
+                        // detect punctuation immediately following the match
+                        const after = string.slice(offset + match.length, offset + match.length + 1);
+                        const trailingPunct = /^[.,]/.test(after) ? after : '';
+
+                        const lowered = match.toLowerCase();
+                        // return bracketed lowered word, and move trailing punctuation OUTSIDE the brackets
+                        return '[' + lowered.replace(/[.,]+$/g, '') + ']' + (trailingPunct || '');
+                    });
+
+                    // remove any stray punctuation inside brackets (just in case)
+                    filteredText = filteredText.replace(/\[\s*([^\]\n]*?)\s*[.,]+\s*\]/g, function(m, inner) {
+                        return '[' + inner.trim().replace(/[.,]+$/g, '').toLowerCase() + ']';
+                    });
+                } catch (err) {
+                    console.warn('Filler wrap error:', err);
                 }
             }
 
@@ -226,19 +317,24 @@
         // Event listeners
         document.getElementById('process-button').addEventListener('click', processText);
 
+        // Settings buttons
+        document.getElementById('save-settings').addEventListener('click', saveSettings);
+        document.getElementById('clear-settings').addEventListener('click', clearSettings);
+
         // Modal close button
         document.getElementById('modal-close').addEventListener('click', hideNotification);
 
-        // Enter key handling
-        // When Enter is pressed in the words-to-remove field, focus the filtered output field.
-        // Assumption: "second output field" refers to the filtered text output.
-        document.getElementById('words-to-remove').addEventListener('keydown', function(e) {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                document.getElementById('filtered-text').focus();
-                document.getElementById('filtered-text').select();
-            }
-        });
+        // Enter key handling: when Enter in settings words-to-remove, focus filtered output
+        const settingsWordsEl = document.getElementById('settings-words-to-remove');
+        if (settingsWordsEl) {
+            settingsWordsEl.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    document.getElementById('filtered-text').focus();
+                    document.getElementById('filtered-text').select();
+                }
+            });
+        }
 
         document.getElementById('original-text').addEventListener('keydown', function(e) {
             if (e.key === 'Enter') {
@@ -253,6 +349,9 @@
                 hideNotification();
             }
         });
+
+        // Load settings on startup
+        loadSettings();
     </script>
 </body>
 </html>
