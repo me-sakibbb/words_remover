@@ -45,14 +45,14 @@
             <!-- 1. Words to Remove Input -->
             <div class="space-y-2">
                 <label for="words-to-remove" class="block text-sm font-medium text-gray-300">Words to Remove (Separate by space, comma, or newline):</label>
-                <textarea id="words-to-remove" rows="3" placeholder="Enter words like: and, the, a, but, etc."
+                <textarea id="words-to-remove" rows="3" placeholder="Enter words like: and, the, a, but, etc. (Press Enter to process)"
                     class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-gray-100 focus:ring-blue-500 focus:border-blue-500 transition duration-150"></textarea>
             </div>
 
             <!-- 2. Original Text Input -->
             <div class="space-y-2">
                 <label for="original-text" class="block text-sm font-medium text-gray-300">Original Text to Filter:</label>
-                <textarea id="original-text" rows="8" placeholder="Paste your text here..."
+                <textarea id="original-text" rows="8" placeholder="Paste your text here... (Press Enter to process)"
                     class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-gray-100 focus:ring-blue-500 focus:border-blue-500 transition duration-150"></textarea>
             </div>
             
@@ -74,7 +74,7 @@
             <div class="space-y-2">
                 <label for="filtered-text" class="block text-sm font-medium text-gray-300 flex justify-between items-center">
                     <span>Filtered Text:</span>
-                    <!-- Removed the copy button as copying is now automatic -->
+                    <!-- Copying is automatic -->
                 </label>
                 <textarea id="filtered-text" rows="8" readonly placeholder="The filtered text will appear here and be automatically copied..."
                     class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-gray-100 cursor-default opacity-90"></textarea>
@@ -102,7 +102,6 @@
             const filteredTextarea = document.getElementById('filtered-text');
             const caseSensitiveCheckbox = document.getElementById('case-sensitive');
             const processButton = document.getElementById('process-button');
-            // copyButton is now unused/removed
             const modal = document.getElementById('notification-modal');
             const modalMessage = document.getElementById('notification-message');
             const modalCloseButton = document.getElementById('modal-close-button');
@@ -153,6 +152,17 @@
 
             // --- Event Listeners ---
             modalCloseButton.addEventListener('click', hideNotification);
+
+            // Add keypress listener to both input textareas to trigger processText on Enter
+            [wordsInput, originalTextarea].forEach(element => {
+                element.addEventListener('keypress', (event) => {
+                    // Check if the pressed key is Enter (key code 13 or key name 'Enter')
+                    if (event.key === 'Enter') {
+                        event.preventDefault(); // Prevents adding a newline in the textarea
+                        processText();
+                    }
+                });
+            });
 
             processButton.addEventListener('click', processText);
             
@@ -210,12 +220,17 @@
                 try {
                     const regex = new RegExp(pattern, flags);
                     
-                    // 4. Perform the replacement. Using an empty string removes the matched words.
-                    filteredText = originalText.replace(regex, ' '); // Replace with a space to prevent word fusion
+                    // 4. Perform the replacement. Use an empty string to remove the matched words.
+                    // The \b boundary ensures we only remove whole words, even if surrounded by punctuation like [word].
+                    filteredText = originalText.replace(regex, ''); 
 
-                    // 5. Clean up extra spaces caused by word removal
+                    // 5. Clean up extra spaces caused by word removal, including those next to punctuation/brackets.
                     filteredText = filteredText
-                        .replace(/\s{2,}/g, ' ') // Replace 2 or more spaces with a single space
+                        .replace(/\s{2,}/g, ' ')           // Replace 2 or more spaces with a single space
+                        // Remove space before punctuation and closing brackets
+                        .replace(/\s([.,;?!\]\)])/g, '$1') 
+                        // Remove space after opening brackets and punctuation (for internal text cleaning)
+                        .replace(/([(\[])\s/g, '$1')       
                         .trim(); // Trim leading/trailing whitespace
 
                     // 6. Display result
