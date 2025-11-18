@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Word Filter & Remover Tool</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom scrollbar for textareas */
+        textarea::-webkit-scrollbar {
+            width: 8px;
+        }
+        textarea::-webkit-scrollbar-thumb {
+            background-color: #4b5563; /* Gray-600 */
+            border-radius: 4px;
+        }
+        textarea {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Custom dark theme colors */
+        :root {
+            --bg-dark: #1f2937; /* Gray-800 */
+            --bg-card: #374151; /* Gray-700 */
+            --text-light: #f3f4f6; /* Gray-100 */
+            --accent-blue: #3b82f6; /* Blue-500 */
+        }
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-light);
+            min-height: 100vh;
+        }
+    </style>
+</head>
+<body class="p-4 sm:p-8">
+
+    <div class="max-w-4xl mx-auto">
+        <header class="text-center mb-8">
+            <h1 class="text-4xl font-extrabold text-white mb-2">Text Filter Tool</h1>
+            <p class="text-gray-400">Remove specific words from your text quickly and efficiently.</p>
+        </header>
+
+        <div id="app-container" class="bg-gray-800 p-6 rounded-xl shadow-2xl space-y-6">
+
+            <!-- 1. Words to Remove Input -->
+            <div class="space-y-2">
+                <label for="words-to-remove" class="block text-sm font-medium text-gray-300">Words to Remove (Separate by space, comma, or newline):</label>
+                <textarea id="words-to-remove" rows="3" placeholder="Enter words like: and, the, a, but, etc."
+                    class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-gray-100 focus:ring-blue-500 focus:border-blue-500 transition duration-150"></textarea>
+            </div>
+
+            <!-- 2. Original Text Input -->
+            <div class="space-y-2">
+                <label for="original-text" class="block text-sm font-medium text-gray-300">Original Text to Filter:</label>
+                <textarea id="original-text" rows="8" placeholder="Paste your text here..."
+                    class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-gray-100 focus:ring-blue-500 focus:border-blue-500 transition duration-150"></textarea>
+            </div>
+            
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-4 sm:space-y-0 sm:space-x-4">
+                <!-- Case Sensitivity Toggle -->
+                <div class="flex items-center">
+                    <input id="case-sensitive" type="checkbox" class="h-4 w-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500">
+                    <label for="case-sensitive" class="ml-2 block text-sm text-gray-300 select-none">Case Sensitive Removal</label>
+                </div>
+                
+                <!-- Process Button -->
+                <button id="process-button"
+                    class="w-full sm:w-auto px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-md transition duration-200 ease-in-out transform hover:scale-[1.02] active:scale-[0.98] focus:outline-none focus:ring-4 focus:ring-blue-500/50">
+                    Process & Auto-Copy Text
+                </button>
+            </div>
+
+            <!-- 3. Filtered Text Output -->
+            <div class="space-y-2">
+                <label for="filtered-text" class="block text-sm font-medium text-gray-300 flex justify-between items-center">
+                    <span>Filtered Text:</span>
+                    <!-- Removed the copy button as copying is now automatic -->
+                </label>
+                <textarea id="filtered-text" rows="8" readonly placeholder="The filtered text will appear here and be automatically copied..."
+                    class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-gray-100 cursor-default opacity-90"></textarea>
+            </div>
+        </div>
+    </div>
+
+    <!-- Custom Modal for Notifications -->
+    <div id="notification-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center p-4 z-50 transition-opacity duration-300" aria-modal="true" role="dialog">
+        <div class="bg-gray-700 p-6 rounded-lg shadow-xl max-w-sm w-full">
+            <h3 class="text-xl font-bold mb-3 text-white">Notice</h3>
+            <p id="notification-message" class="text-gray-300 mb-4">Message content.</p>
+            <button id="modal-close-button" class="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg">
+                Close
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // IIFE for scope isolation and setup
+        (function() {
+            // --- Element References ---
+            const wordsInput = document.getElementById('words-to-remove');
+            const originalTextarea = document.getElementById('original-text');
+            const filteredTextarea = document.getElementById('filtered-text');
+            const caseSensitiveCheckbox = document.getElementById('case-sensitive');
+            const processButton = document.getElementById('process-button');
+            // copyButton is now unused/removed
+            const modal = document.getElementById('notification-modal');
+            const modalMessage = document.getElementById('notification-message');
+            const modalCloseButton = document.getElementById('modal-close-button');
+
+            /**
+             * Shows a custom notification modal.
+             * @param {string} message The message to display.
+             */
+            function showNotification(message) {
+                modalMessage.textContent = message;
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+            }
+
+            /**
+             * Hides the custom notification modal.
+             */
+            function hideNotification() {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            }
+
+            /**
+             * Copies the text from the filtered textarea to the clipboard.
+             * @param {string} textToCopy The text to copy.
+             * @returns {boolean} True if copy was successful, false otherwise.
+             */
+            function copyToClipboard(textToCopy) {
+                if (!textToCopy) {
+                    showNotification("The filtered text is empty and cannot be copied.");
+                    return false;
+                }
+                
+                // Select the content of the textarea
+                filteredTextarea.select();
+                
+                // Use document.execCommand('copy') for better compatibility in iframe environments
+                try {
+                    document.execCommand('copy');
+                    return true;
+                } catch (err) {
+                    console.error('Failed to copy text: ', err);
+                    showNotification("Failed to automatically copy text. Please try manually selecting and copying the output.");
+                    return false;
+                }
+            }
+
+
+            // --- Event Listeners ---
+            modalCloseButton.addEventListener('click', hideNotification);
+
+            processButton.addEventListener('click', processText);
+            
+            // --- Core Logic ---
+
+            /**
+             * Escapes special characters in a string to be safely used inside a RegExp.
+             * @param {string} str The string to escape.
+             * @returns {string} The escaped string.
+             */
+            function escapeRegExp(str) {
+                // $& means the whole matched string
+                return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            }
+
+            /**
+             * Processes the input text, removes the specified words, displays the result, and copies it.
+             */
+            function processText() {
+                const wordsToRemoveRaw = wordsInput.value;
+                const originalText = originalTextarea.value;
+                const isCaseSensitive = caseSensitiveCheckbox.checked;
+                let filteredText = "";
+
+                if (!originalText) {
+                    showNotification("Please paste some text into the 'Original Text' area.");
+                    filteredTextarea.value = "";
+                    return;
+                }
+
+                // 1. Clean and filter the list of words. Splits by comma, space, or newline.
+                const words = wordsToRemoveRaw
+                    .split(/[\s,]+/)
+                    .map(w => w.trim())
+                    .filter(w => w.length > 0);
+
+                if (words.length === 0) {
+                    filteredText = originalText;
+                    filteredTextarea.value = filteredText;
+                    if (copyToClipboard(filteredText)) {
+                        showNotification("No words specified for removal. The original text was copied to the clipboard.");
+                    }
+                    return;
+                }
+
+                // 2. Escape special regex characters in each word and join them with '|' (OR).
+                // Word boundary (\b) anchors ensure that we only match whole words.
+                const escapedWords = words.map(escapeRegExp);
+                const pattern = `\\b(${escapedWords.join('|')})\\b`;
+
+                // 3. Set flags for the regular expression. 'g' (global) is mandatory.
+                // 'i' (case-insensitive) is used if the checkbox is NOT checked.
+                const flags = isCaseSensitive ? 'g' : 'gi';
+                
+                try {
+                    const regex = new RegExp(pattern, flags);
+                    
+                    // 4. Perform the replacement. Using an empty string removes the matched words.
+                    filteredText = originalText.replace(regex, ' '); // Replace with a space to prevent word fusion
+
+                    // 5. Clean up extra spaces caused by word removal
+                    filteredText = filteredText
+                        .replace(/\s{2,}/g, ' ') // Replace 2 or more spaces with a single space
+                        .trim(); // Trim leading/trailing whitespace
+
+                    // 6. Display result
+                    filteredTextarea.value = filteredText;
+
+                    // 7. Auto-copy result and provide success notification
+                    if (copyToClipboard(filteredText)) {
+                         showNotification("Text successfully filtered and copied to clipboard!");
+                    }
+
+                } catch (e) {
+                    console.error("Regex Error:", e);
+                    showNotification(`An error occurred during processing. Check your word list for complex characters: ${e.message}`);
+                    filteredTextarea.value = "";
+                }
+            }
+
+        })();
+    </script>
+</body>
+</html>
