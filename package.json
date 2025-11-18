@@ -1,0 +1,19 @@
+{
+  "name": "remove-words",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/me-sakibbb/words_remover.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/me-sakibbb/words_remover/issues"
+  },
+  "homepage": "https://github.com/me-sakibbb/words_remover#readme",
+  "description": ""
+}
