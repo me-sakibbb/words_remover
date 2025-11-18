@@ -178,6 +178,25 @@
                 }
             }
 
+            // Post-removal adjustments for square-bracket content:
+            // - Remove any trailing periods (full stops) before the closing ]
+            // - Lowercase the first alphabetic character inside the brackets (user requested "small caps"; interpreted as lowercase here)
+            filteredText = filteredText.replace(/\[([^\]]*?)\]/g, function(match, inner) {
+                // Trim inner spaces on both ends
+                let newInner = inner.replace(/^\s+|\s+$/g, '');
+
+                // Remove trailing periods
+                newInner = newInner.replace(/\.+$/g, '');
+
+                // Lowercase first alphabetic character (if any)
+                newInner = newInner.replace(/^([^\p{L}]*)\p{L}/u, function(m) {
+                    // m is whole match; we need to find the first letter and lowercase it
+                    return m.slice(0, -1) + m.slice(-1).toLowerCase();
+                });
+
+                return '[' + newInner + ']';
+            });
+
             // Post-processing cleanup
             filteredText = filteredText
                 .replace(/\s{2,}/g, ' ')                    // Multiple spaces to single space
